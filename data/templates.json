@@ -1,0 +1,10 @@
+{
+    "group1": {
+        "sentence1": "{{person}} started {{object}}.",
+        "sentence2": "Did {{person}} start {{object}}?",
+    },
+    "group2": {
+        "sentence1": "Has {{person}} started {{object}}?",
+        "sentence2": "{{person}} saw the {{object}} being started."        
+    }
+}

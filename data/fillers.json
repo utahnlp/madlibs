@@ -1,0 +1,20 @@
+{
+    "person": [
+        "I",
+        "He",
+        "She",
+        "They",
+        "John",
+        "Mary",
+        "Jill",
+        "William",
+        "Nathan"
+    ],
+    "object": [
+        "the car",
+        "the engine",
+        "the laptop",
+        "a computer",
+        "a car"
+    ]
+}
