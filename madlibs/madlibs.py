@@ -1,15 +1,28 @@
 import itertools
 import json
 from collections import ChainMap
-from typing import Dict, List
+from typing import Dict, List, Tuple, Set
+
+import re
 
 
 class MadLibs:
     templates: Dict[str, str]
+    variables: Set[str]
 
     def __init__(self, templates: Dict[str, str], fillers):
         self.templates = templates
         self.fillers = self.__reformat_fillers(fillers)
+        self.variables = self.__find_variables(templates)
+
+    def __find_variables(self, templates) -> Set[str]:
+        regex = re.compile("{{([^}]*)}}")
+        variables = set()
+        for key in templates:
+            template = templates[key]
+            variables.update(regex.findall(template))
+
+        return variables
 
     def __reformat_fillers(self, data):
         fillers = []
@@ -26,17 +39,23 @@ class MadLibs:
     def generate(self):
         all_options = list(itertools.product(*self.fillers))
         seen = set()
+
+        # todo: self.variables can be used to make this more efficient
         for parameters in all_options:
             params_dict: Dict[str, str] = dict(ChainMap(*parameters))
             relevant_params = dict()
             generated = {}
             for key in self.templates:
                 template = self.templates[key]
-                # my_params = self.find_relevant_params(template, params_dict)
                 generated[key], relevant_keys = self.apply(template, params_dict)
 
                 relevant_params.update(
-                    dict(map(lambda k: [k, params_dict[k]], relevant_keys))
+                    dict(
+                        map(
+                            lambda k: [k, params_dict[k]],
+                            relevant_keys,
+                        )
+                    )
                 )
 
             identifier = hash(json.dumps(relevant_params))
@@ -44,28 +63,7 @@ class MadLibs:
                 seen.add(identifier)
                 yield {"params": relevant_params, "text": generated}
 
-    def find_relevant_params(
-        self, template: str, parameters: Dict[str, str]
-    ) -> Dict[str, str]:
-        # If removing a parameter doesn't change the output, it is not relevant
-        base = self.apply(template, parameters)
-
-        relevant_keys = []
-        for key in parameters:
-            new_params = dict(parameters)
-            new_params.pop(key)
-
-            generated = self.apply(template, new_params)
-            if generated != base:
-                relevant_keys.append(key)
-
-        filtered_dict = {}
-        for k in relevant_keys:
-            filtered_dict[k] = parameters[k]
-
-        return filtered_dict
-
-    def apply(self, template: str, parameters: Dict[str, str]) -> List[str]:
+    def apply(self, template: str, parameters: Dict[str, str]) -> Tuple[str, Set[str]]:
         result = template
         relevant_keys = set()
         for key in parameters.keys():
