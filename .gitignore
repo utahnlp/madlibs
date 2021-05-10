@@ -144,3 +144,5 @@ cython_debug/
 /.project
 /.pydevproject
 .settings
+
+poetry.lock

@@ -1,0 +1,17 @@
+{
+    "person": [
+        {
+            "name": "Jack",
+            "pronoun": "He"
+        },
+        {
+            "name": "Jill",
+            "pronoun": "She"
+        }      
+        
+    ],
+    "object": [
+        "cake",
+        "coffee"
+    ]
+}
