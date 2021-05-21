@@ -3,7 +3,7 @@ import tempfile
 import nox
 
 core = ["madlibs"]
-locations = "madlibs", "tests", "noxfile.py"
+locations = ["madlibs"]
 nox.options.sessions = "lint", "mypy", "tests"
 
 

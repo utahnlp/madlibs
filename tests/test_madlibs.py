@@ -1,5 +1,5 @@
-from madlibs import __version__
 from madlibs import MadLibs, make_madlibs
+from madlibs import __version__
 
 
 def test_version():
@@ -18,8 +18,8 @@ def test_generate():
     assert len(g) == 4
 
     for item in g:
-        params = item["params"]
-        text = item["text"]
+        params = item[0]
+        text = item[1]
         assert "s1" in text
         assert text["s1"] == f"{params['person']} likes {params['object']}."
 
@@ -39,8 +39,8 @@ def test_generate_from_dictionary():
     assert len(g) == 4
 
     for item in g:
-        params = item["params"]
-        text = item["text"]
+        params = item[0]
+        text = item[1]
         assert "s1" in text
         assert (
             text["s1"]
@@ -56,8 +56,8 @@ def test_from_file():
     assert len(g) == 4
 
     for item in g:
-        params = item["params"]
-        text = item["text"]
+        params = item[0]
+        text = item[1]
         assert "s1" in text
         assert (
             text["s1"]
