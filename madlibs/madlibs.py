@@ -13,7 +13,7 @@ class MadLibs:
 
     def __init__(self, templates: Dict[str, str], fillers: Dict[Any, Any]) -> None:
         self.templates = MadLibTemplateGroup(templates)
-        self.fillers = self.__reformat_fillers(fillers)  # noqa: ANN001
+        self.fillers = self.__reformat_fillers(fillers)
 
     def __reformat_fillers(self, data: Dict[Any, Any]) -> List[List[Dict[str, str]]]:
         fillers: List[List[Dict[str, str]]] = []
