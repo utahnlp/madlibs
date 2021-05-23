@@ -6,5 +6,5 @@ max-line-length = 88
 application-import-names = madlibs,tests
 import-order-style = pycharm
 per-file-ignores =
-    tests/*:S101,ANN
+    tests/*:S101,ANN,E501
     noxfile.py:ANN
