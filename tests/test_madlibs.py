@@ -26,13 +26,13 @@ def test_generate():
 
 
 def test_generate_from_dictionary():
-    template = {"s1": "{{name}} likes {{object}}. {{pronoun}} does."}
+    template = {"s1": "{{name}} likes {{object}}. {{pronoun | title}} does."}
 
     fillers = {
         "object": ["cake", "coffee"],
         "person": [
-            {"name": "Jack", "pronoun": "He"},
-            {"name": "Jill", "pronoun": "She"},
+            {"name": "Jack", "pronoun": "he"},
+            {"name": "Jill", "pronoun": "she"},
         ],
     }
     m = MadLibs(template, fillers)
@@ -43,10 +43,10 @@ def test_generate_from_dictionary():
         params = item[0]
         text = item[1]
         assert "s1" in text
-        assert (
-            text["s1"]
-            == f"{params['name']} likes {params['object']}. {params['pronoun']} does."
-        )
+        n = params["name"]
+        o = params["object"]
+        p = params["pronoun"].capitalize()
+        assert text["s1"] == f"{n} likes {o}. {p} does."
 
 
 def test_from_file():
@@ -60,10 +60,10 @@ def test_from_file():
         params = item[0]
         text = item[1]
         assert "s1" in text
-        assert (
-            text["s1"]
-            == f"{params['name']} likes {params['object']}. {params['pronoun']} does."
-        )
+        n = params["name"]
+        o = params["object"]
+        p = params["pronoun"].capitalize()
+        assert text["s1"] == f"{n} likes {o}. {p} does."
 
 
 def test_filler_constraints():

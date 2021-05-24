@@ -2,13 +2,12 @@
     "person": [
         {
             "name": "Jack",
-            "pronoun": "He"
+            "pronoun": "he"
         },
         {
             "name": "Jill",
-            "pronoun": "She"
-        }      
-        
+            "pronoun": "she"
+        }
     ],
     "object": [
         "cake",

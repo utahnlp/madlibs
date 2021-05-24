@@ -1,5 +1,5 @@
 {
     "group1": {
-        "s1": "{{name}} likes {{object}}. {{pronoun}} does."
+        "s1": "{{name}} likes {{object}}. {{pronoun | title}} does."
     }
 }
