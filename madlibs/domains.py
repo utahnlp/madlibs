@@ -4,7 +4,7 @@ from typing import Any, Dict, List, Optional, Set
 
 from jinja2 import Environment
 
-from madlibs.core import FillerType
+from madlibs.core import FillerType, known_domains
 
 
 class Domain(abc.ABC):
@@ -312,9 +312,6 @@ def make_domain(
         return [make_range_domain(variable_name, *args)]
     else:
         return []
-
-
-known_domains = ["type", "range"]
 
 
 def register_known_domains(env: Environment) -> None:

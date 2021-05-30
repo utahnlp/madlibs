@@ -3,7 +3,7 @@ from typing import Any, Dict, Optional
 
 from jinja2 import Environment
 
-known_constraints = ["less_than", "greater_than", "equals"]
+from madlibs.core import known_constraints
 
 
 def register_known_constraints(env: Environment) -> None:
