@@ -256,3 +256,19 @@ def test_template_unification_failures():
     template = '{{name}} {{pronoun}} {{pronoun | type("name")}}'
     with pytest.raises(Exception):
         MadLibTemplate(template, fillers)
+
+
+def test_multiple_dependents():
+    fillers = {
+        "person": [
+            {"name": "Jack", "pronoun": "he", "noun": "man"},
+            {"name": "Jill", "pronoun": "she", "noun": "woman"},
+        ],
+        "location": ["New York", "Chicago"],
+    }
+
+    template = "{{name}} {{pronoun}} {{noun}} {{pronoun}}"
+
+    m = MadLibTemplate(template, fillers)
+    generated = m.render({"name": "Jack", "pronoun": "he", "noun": "man"})
+    assert generated == "Jack he man he"

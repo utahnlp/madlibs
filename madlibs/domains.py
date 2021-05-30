@@ -226,6 +226,23 @@ class FillerDependentDomain(DependentDomain):
             self.variable_name,
         )
 
+    def unify_with(self, other: Domain) -> Optional[Domain]:
+        d = super().unify_with(other)
+        if d is None:
+            if (
+                isinstance(other, FillerDependentDomain)
+                and self.variable_name == other.variable_name
+            ):
+                # We have two variables with the same name, but possibly different
+                # parents. This can happen in two cases: Either the two are in
+                # different filler clusters, and so they cannot be unified, or they
+                # are in the same cluster and they can be. We can check for the latter
+                # by examining the dependent information in the parent
+                if other.variable_name in self.parent.dependent_variables:
+                    return self
+            return None
+        return d
+
 
 def make_filler_domain(
     variable_name: str,

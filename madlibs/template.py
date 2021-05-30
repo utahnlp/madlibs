@@ -7,6 +7,7 @@ from madlibs.constraints import Constraint, make_constraint, register_known_cons
 from madlibs.core import FillerType
 from madlibs.domains import (
     Domain,
+    FillerDependentDomain,
     make_domain,
     make_filler_domain,
     register_known_domains,
@@ -151,7 +152,17 @@ class MadLibTemplate:
         for d in dependents:
             v = d.variable_name
             if v not in collected_dependents:
-                collected_dependents[v] = d
+                # only add something as a dependent if it is not a parent already
+                is_parent = False
+                for name in collected_dependents:
+                    dep = collected_dependents[name]
+                    if isinstance(dep, FillerDependentDomain):
+                        if v == dep.parent.variable_name:
+                            is_parent = True
+                            break
+
+                if not is_parent:
+                    collected_dependents[v] = d
             else:
                 unified = collected_dependents[v].unify_with(d)
                 if unified is None:
@@ -167,11 +178,7 @@ class MadLibTemplate:
         collected_dependents: Dict[str, Domain],
     ) -> Domain:
         if variable_name in collected_dependents:
-            d = domain.unify_with(collected_dependents[variable_name])
-            if d is None:
-                raise Exception(f"Unification failure for {variable_name}")
-            else:
-                return d
+            return try_unify(collected_dependents[variable_name], domain)
         else:
             return domain
 

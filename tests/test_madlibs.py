@@ -234,8 +234,8 @@ def test_greater_than():
 
 def test_constraint_chaining():
     s = (
-        "{{n | range(0, 5, 1)}} and {{m | range(1, 6, 1)}} are both less"
-        + 'than {{r | range(0, 7, 1) | greater_than("m") | greater_than("n")}}.'
+        "{{n | range(0, 5, 1)}} and {{m | range(1, 6, 1)}} are both "
+        + 'less than {{r | range(0, 7, 1) | greater_than("m") | greater_than("n")}}.'
     )
     templates = {"s": s}
     m = MadLibs(templates, {})
