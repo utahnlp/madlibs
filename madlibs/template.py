@@ -1,40 +1,105 @@
-from typing import Any, Callable, Dict, List, Optional, Set, Tuple
+from typing import Dict, List, Optional, Set, Tuple
 
 import jinja2.nodes as jnodes
 from jinja2 import Environment, Template, meta
+
+from madlibs.constraints import Constraint, make_constraint, register_known_constraints
+from madlibs.core import FillerType
+from madlibs.domains import (
+    Domain,
+    make_domain,
+    make_filler_domain,
+    register_known_domains,
+    try_unify,
+)
 
 
 class MadLibTemplate:
     template: Template
     variables: Set[str]
-    constraints: Dict[str, Dict[str, Any]]
+    constraints: Dict[str, List[Constraint]]
+    domains: Dict[str, Domain]
 
-    def __init__(self, template: str) -> None:
-        def dummy_constraint_processor(x: str, value: str) -> str:
-            return x
-
-        def dummy_range_processor(x: str, start: Any, end: Any, step: Any) -> str:
-            return x
-
+    def __init__(
+        self,
+        template: str,
+        fillers: Dict[str, List[FillerType]],
+        collected_dependents: Dict[str, Domain] = None,
+    ) -> None:
         env = Environment(autoescape=True)
+        register_known_domains(env)
+        register_known_constraints(env)
 
-        env.filters["type"] = dummy_constraint_processor
-        env.filters["range"] = dummy_range_processor
-        ast = env.parse(template)
-        self.constraints = self.__collect_constraints(ast)
         self.template = env.from_string(template)
+        self.domains = {}
+        self.constraints = {}
+
+        ast = env.parse(template)
         self.variables = meta.find_undeclared_variables(ast)
 
-    def __walk_ast(
+        if collected_dependents is None:
+            collected_dependents = {}
+        self.__collect_constraints(ast, fillers, collected_dependents)
+
+        # At this point, every variable should have a domain
+        for v in self.variables:
+            if v not in self.domains:
+                raise Exception(f"Missing domain for {v}")
+
+    def __walk_filter_node(
+        self,
+        node: jnodes.Filter,
+        fillers: Dict[str, List[FillerType]],
+        collected_dependents: Dict[str, Domain],
+    ) -> Tuple[str, List[Constraint], Domain, List[Domain]]:
+        n = node
+        filters = []
+
+        while not isinstance(n, jnodes.Name):
+            filters.append((n.name, n.args))  # type: ignore
+            n = n.node  # type: ignore
+
+        # at this point, we are on a Name node.
+        variable_name: str = n.name  # type: ignore
+
+        node_constraints: List[Constraint] = []
+        domain: Optional[Domain] = None
+        dependent_domains: List[Domain] = []
+
+        for constraint_name, raw_args in filters:
+            args = list(map(lambda a: a.value, raw_args))
+            domains = make_domain(constraint_name, variable_name, fillers, *args)
+
+            if len(domains) >= 1:
+                if domain is not None:
+                    raise Exception(f"Multiple types assigned for {variable_name}")
+                domain = domains[0]
+                domain = self.__try_reconcile_with_collected_dependent(
+                    variable_name, domains[0], collected_dependents
+                )
+
+                dependent_domains.extend(domains[1:])
+
+            constraint = make_constraint(constraint_name, variable_name, *args)
+            if constraint is not None:
+                node_constraints.append(constraint)
+
+        if domain is None:
+            if variable_name in collected_dependents:
+                domain = collected_dependents[variable_name]
+            else:
+                domains = make_filler_domain(variable_name, fillers, variable_name)
+                domain = domains[0]
+                dependent_domains.extend(domains[1:])
+
+        return variable_name, node_constraints, domain, dependent_domains
+
+    def __collect_constraints(
         self,
         ast: jnodes.Template,
-        filter_processors: List[
-            Callable[
-                [jnodes.Filter, Dict[str, Any]],
-                Dict[str, Any],
-            ]
-        ],
-    ) -> Dict[str, Dict[str, Any]]:
+        fillers: Dict[str, List[FillerType]],
+        collected_dependents: Dict[str, Domain],
+    ) -> None:
         # For some reason mypy doesn't seem to know about the types within
         # jinja2.nodes. So there will be a lot of ignores here.
         if len(ast.body) > 1:  # type: ignore
@@ -43,145 +108,79 @@ class MadLibTemplate:
             output = ast.body[0]  # type: ignore
             if isinstance(output, jnodes.Output):
                 nodes = output.nodes  # type: ignore
+
                 # now each node is either a filter or a name or data. We don't care
                 # about the names
-                variable_info = {}
                 for node in nodes:
                     if isinstance(node, jnodes.Name):
                         name = node.name  # type: ignore
-                        variable_info[name] = {"type": name}
+
+                        domains = make_filler_domain(name, fillers, name)
+                        domain = self.__try_reconcile_with_collected_dependent(
+                            name, domains[0], collected_dependents
+                        )
+                        self.domains[name] = domain
+
+                        self.__update_dependents(collected_dependents, domains[1:])
+                        self.constraints[name] = []
                     elif isinstance(node, jnodes.Filter):
-                        n = node
-                        info: Dict[str, Dict[str, str]] = {}
-                        while not isinstance(n, jnodes.Name):
-                            for f in filter_processors:
-                                f(n, info)
-                            n = n.node  # type: ignore
-                        name = n.name  # type: ignore
-                        if "type" not in info:
-                            info["type"] = name
-                        variable_info[name] = info
-                return variable_info
+                        name = node.name  # type: ignore
+
+                        name, constraints, domain, dependents = self.__walk_filter_node(
+                            node,
+                            fillers,
+                            collected_dependents,
+                        )
+                        if name not in self.domains:
+                            if name in collected_dependents:
+                                self.domains[name] = try_unify(
+                                    collected_dependents[name], domain
+                                )
+                            else:
+                                self.domains[name] = domain
+                        else:
+                            self.domains[name] = try_unify(self.domains[name], domain)
+                        self.__update_dependents(collected_dependents, dependents)
+                        self.constraints[name] = constraints
             else:
                 raise Exception(f"Expecting output, found {output}")
 
-    def __collect_constraints(self, ast: jnodes.Template) -> Dict[str, Dict[str, Any]]:
-        def named_constraint(
-            name: str,
-        ) -> Callable[[jnodes.Filter, Dict[str, Any]], Dict[str, Any]]:
-            def f(filter: jnodes.Filter, info: Dict[str, Any]) -> Dict[str, Any]:
-                if filter.name == name:  # type: ignore
-                    if name in info:
-                        raise Exception(f"Duplicate {name}")
-                    info[name] = filter.args[0].value  # type: ignore
-                return info
+    def __update_dependents(
+        self, collected_dependents: Dict[str, Domain], dependents: List[Domain]
+    ) -> None:
+        for d in dependents:
+            v = d.variable_name
+            if v not in collected_dependents:
+                collected_dependents[v] = d
+            else:
+                unified = collected_dependents[v].unify_with(d)
+                if unified is None:
+                    other_type = collected_dependents[v].variable_type
+                    raise Exception(
+                        f"{other_type} cannot be unified with {d.variable_type}"
+                    )
 
-            return f
-
-        def range_processor(
-            filter: jnodes.Filter,
-            info: Dict[str, Any],
-        ) -> Dict[str, Any]:
-            if filter.name == "range" and len(filter.args) == 3:  # type: ignore
-                start = filter.args[0].value  # type: ignore
-                end = filter.args[1].value  # type: ignore
-                step = filter.args[2].value  # type: ignore
-                info["range"] = (start, end, step)
-                info["type"] = "number"
-            return info
-
-        filter_processors = [named_constraint("type"), range_processor]
-
-        return self.__walk_ast(ast, filter_processors)
+    def __try_reconcile_with_collected_dependent(
+        self,
+        variable_name: str,
+        domain: Domain,
+        collected_dependents: Dict[str, Domain],
+    ) -> Domain:
+        if variable_name in collected_dependents:
+            d = domain.unify_with(collected_dependents[variable_name])
+            if d is None:
+                raise Exception(f"Unification failure for {variable_name}")
+            else:
+                return d
+        else:
+            return domain
 
     def render(self, fillers: Dict[str, str]) -> str:
         # At this point, all the constraints have been resolved from the template group
-        # So we should safely be able to blindly render the template.
+        # So we should safely be able to blindly render the template. But to be safe,
+        # let us ensure that all the variables have a filler.
+
+        for v in self.variables:
+            if v not in fillers:
+                raise Exception(f"Missing filler for variable {v}")
         return self.template.render(**fillers)
-
-
-class MadLibTemplateGroup:
-    templates: Dict[str, MadLibTemplate]
-    variables: Set[str]
-    constraints: Dict[str, Dict[str, Any]]
-
-    def __init__(self, templates: Dict[str, str]) -> None:
-        self.templates = {}
-        self.variables = set()
-        self.constraints = {}
-        for k in templates:
-            t = MadLibTemplate(templates[k])
-            self.templates[k] = t
-            self.variables.update(t.variables)
-            self.__merge_constraints(t.variables, t.constraints)
-
-        # every variable should have a constraint
-        if len(self.variables) != len(self.constraints):
-            raise Exception("Not all variables have constraints")
-
-    def __merge_constraints(
-        self,
-        variables: Set[str],
-        constraints: Dict[str, Dict[str, Any]],
-    ) -> None:
-        for v in variables:
-            if v not in self.constraints:
-                self.constraints[v] = {}
-
-        for key in constraints:
-            value = constraints[key]
-            for item_key in value:
-                item_value = value[item_key]
-                if item_key not in self.constraints[key]:
-                    self.constraints[key][item_key] = item_value
-                else:
-                    current_value = self.constraints[key][item_key]
-                    if current_value != item_value:
-                        # It looks like the variable is declared with different types
-                        # in different places.
-                        raise Exception(f"Type error for {key}")
-
-    def __reconcile_fillers(self, fillers: Dict[str, str]) -> Dict[str, str]:
-        # At the end of this function, every variable that is in the template should
-        # have a value
-
-        result: Dict[str, str] = {}
-        for variable_name in self.variables:
-            constraint = self.constraints[variable_name]
-
-            # First the type constraint. If the variable name is its type, then we
-            # can just use the filler provided. Otherwise, the variable is associated
-            # with the filler of the corresponding type
-
-            variable_type = constraint["type"]
-            if variable_type == variable_name:
-                result[variable_name] = fillers[variable_name]
-            elif variable_type in fillers:
-                result[variable_name] = fillers[variable_type]
-            elif variable_type == "number" and variable_name in fillers:
-                result[variable_name] = fillers[variable_name]
-
-        return result
-
-    def render(
-        self, fillers: Dict[str, str]
-    ) -> Optional[Tuple[Dict[str, str], Dict[str, str]]]:
-        relevant_params: Dict[str, str] = {}
-        generated: Dict[str, str] = {}
-
-        reconciled_fillers = self.__reconcile_fillers(fillers)
-
-        # At this point, all variables should be in the reconciled fillers. If not, we
-        # need to raise an exception
-
-        for v in self.variables:
-            if v not in reconciled_fillers:
-                raise Exception(f"Variable {v} assigned any fillers")
-
-        for k in self.templates:
-            generated[k] = self.templates[k].render(reconciled_fillers)
-
-        for v in self.variables:
-            relevant_params[v] = reconciled_fillers[v]
-
-        return relevant_params, generated

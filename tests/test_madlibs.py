@@ -1,10 +1,7 @@
 import pytest
 
-from madlibs import MadLibs, __version__, make_madlibs
-
-
-def test_version():
-    assert __version__ == "0.1.0"
+from madlibs.madlibs import MadLibs
+from madlibs.utils import make_madlibs
 
 
 def test_generate():
@@ -13,6 +10,24 @@ def test_generate():
     fillers = {
         "object": ["cake", "coffee"],
         "person": ["Jack", "Jill"],
+    }
+    m = MadLibs(template, fillers)
+    g = list(m.generate())
+    assert len(g) == 4
+
+    for item in g:
+        params = item[0]
+        text = item[1]
+        assert "s1" in text
+        assert text["s1"] == f"{params['person']} likes {params['object']}."
+
+
+def test_generate_unique():
+    template = {"s1": "{{person}} likes {{object}}."}
+
+    fillers = {
+        "object": ["cake", "coffee", "coffee"],
+        "person": ["Jack", "Jill", "Jill"],
     }
     m = MadLibs(template, fillers)
     g = list(m.generate())
@@ -145,11 +160,8 @@ def test_valid_types():
     fillers = {
         "person": ["John", "Mary"],
     }
-
-    m = MadLibs(templates, fillers)
-
     with pytest.raises(Exception):
-        list(m.generate())
+        MadLibs(templates, fillers)
 
 
 def test_consistent_types():
@@ -164,3 +176,97 @@ def test_consistent_types():
     }
     with pytest.raises(Exception):
         MadLibs(templates, fillers)
+
+
+def test_equals_numeric():
+    s = '{{n | range(0, 10, 2)}} equals {{m | range(0, 10, 2) | equals("n")}}'
+    templates = {"s": s}
+    m = MadLibs(templates, {})
+
+    items = list(m.generate())
+
+    assert len(items) == 5
+    sentences = set(map(lambda item: item[1]["s"], items))
+
+    for i in range(0, 10, 2):
+        assert f"{i} equals {i}" in sentences
+
+
+def test_equals_string():
+    s = '{{n | type("person")}} equals {{m | type("person") | equals("n")}}'
+    templates = {"s": s}
+    m = MadLibs(templates, {"person": ["A", "B"]})
+
+    items = list(m.generate())
+
+    assert len(items) == 2
+    sentences = set(map(lambda item: item[1]["s"], items))
+
+    for i in ["A", "B"]:
+        assert f"{i} equals {i}" in sentences
+
+
+def test_less_than():
+    s = '{{n | range(0, 10, 2) | less_than("m")}} less than {{m | range(0, 10, 2)}}'
+    templates = {"s": s}
+    items = list(MadLibs(templates, {}).generate())
+
+    assert len(items) == 10
+    sentences = set(map(lambda item: item[1]["s"], items))
+
+    for m in range(0, 10, 2):
+        for n in range(0, m, 2):
+            assert f"{n} less than {m}" in sentences
+
+
+def test_greater_than():
+    s = '{{n | range(0, 10, 2) | greater_than("m")}} greater than {{m | range(0, 10, 2)}}'
+    templates = {"s": s}
+    items = list(MadLibs(templates, {}).generate())
+
+    assert len(items) == 10
+    sentences = set(map(lambda item: item[1]["s"], items))
+
+    for n in range(0, 10, 2):
+        for m in range(0, n, 2):
+            assert f"{n} greater than {m}" in sentences
+
+
+def test_constraint_chaining():
+    s = (
+        "{{n | range(0, 5, 1)}} and {{m | range(1, 6, 1)}} are both less"
+        + 'than {{r | range(0, 7, 1) | greater_than("m") | greater_than("n")}}.'
+    )
+    templates = {"s": s}
+    m = MadLibs(templates, {})
+    items = list(m.generate())
+    sentences = set(map(lambda item: item[1]["s"], items))
+
+    count = 0
+    for i in range(0, 5):
+        for j in range(1, 6):
+            for k in range(0, 7):
+                if i < k and j < k:
+                    assert f"{i} and {j} are both less than {k}." in sentences
+                    count = count + 1
+
+    assert len(items) == count
+
+
+def test_generate_with_dependents():
+    fillers = {
+        "person": [
+            {"name": "Jack", "pronoun": "he"},
+            {"name": "Jill", "pronoun": "she"},
+        ],
+        "location": ["New York", "Chicago"],
+    }
+
+    template = {"a": '{{p | type("name")}} {{pronoun}}'}
+    m = MadLibs(template, fillers)
+
+    items = list(m.generate())
+    sentences = set(map(lambda item: item[1]["a"], items))
+    assert len(sentences) == 2
+    assert "Jack he" in sentences
+    assert "Jill she" in sentences
