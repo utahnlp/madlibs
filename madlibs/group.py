@@ -7,6 +7,12 @@ from madlibs.template import MadLibTemplate
 
 
 class MadLibTemplateGroup:
+    """A MadLibTemplateGroup is a collection of templates that are jointly realized
+    via joint assignments to their shared variables. The template group is defined
+    by the list of templates it contains, and the domains of the variables involved.
+
+    """
+
     templates: Dict[str, MadLibTemplate]
     variables: Set[str]
     constraints: Dict[str, List[Constraint]]

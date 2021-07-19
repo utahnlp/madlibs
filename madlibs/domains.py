@@ -8,6 +8,11 @@ from madlibs.core import FillerType, known_domains
 
 
 class Domain(abc.ABC):
+    """The domain of a variable represents the set of fillers it can support. A domain
+    can either be independent of other domains, or can be dependent on others. If a
+    domain is a dependent one, then it typically supports only one filler, whose value
+    is determined by choices for other variables in the template."""
+
     variable_name: str
     variable_type: str
 
@@ -47,6 +52,9 @@ class IndependentDomain(Domain):
 
 
 class FillerDomain(IndependentDomain):
+    """A filler domain is an independent domain. Variables that are defined to
+    belong to a filler domain can take values from a specific list of fillers."""
+
     values: List[str]
     # fillers: List[FillerType]
     dependents: Dict[str, Dict[str, str]]
@@ -129,6 +137,10 @@ class FillerDomain(IndependentDomain):
 
 
 class RangeDomain(IndependentDomain):
+    """A range domain is defined by a range of numbers. Variables defined to belong to
+    this domain can take values in this range.
+    """
+
     start: Number
     end: Number
     step: Number
@@ -140,6 +152,15 @@ class RangeDomain(IndependentDomain):
         end: Number,
         step: Number = 1,  # type: ignore
     ) -> None:
+        """Define a new range domain
+
+        Args:
+            variable_name (str): The name of the variable
+            start (Number): The start of the range
+            end (Number): The end of the range(exclusive)
+            step (Number, optional): The step size used to iterate from start to end.
+                                     Defaults to 1.
+        """
         super().__init__(variable_name=variable_name, variable_type="numeric")
         self.start = start
         self.end = end
