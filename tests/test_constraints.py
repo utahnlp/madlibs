@@ -8,6 +8,9 @@ def test_equality_constraint():
     assert c.check({"a": "1", "b": "1"})
     assert not c.check({"a": "1", "b": "2"})
 
+    assert c.check({"a": "apple", "b": "apple"})
+    assert not c.check({"a": "apple", "b": "cat"})
+
 
 def test_equality_exceptions():
     with pytest.raises(Exception):
@@ -22,6 +25,31 @@ def test_equality_exceptions():
 
     with pytest.raises(Exception):
         c = make_constraint("equals", "a", "b")
+        c.check({"b": "1"})
+
+
+def test_inequality_constraint():
+    c = make_constraint("not_equals", "a", "b")
+    assert not c.check({"a": "1", "b": "1"})
+    assert c.check({"a": "1", "b": "2"})
+
+    assert not c.check({"a": "apple", "b": "apple"})
+    assert c.check({"a": "apple", "b": "cat"})
+
+
+def test_inequality_exceptions():
+    with pytest.raises(Exception):
+        c = make_constraint("not_equals", "a")
+
+    with pytest.raises(Exception):
+        c = make_constraint("not_equals", "a", "b", "c")
+
+    with pytest.raises(Exception):
+        c = make_constraint("not_equals", "a", "b")
+        c.check({"a": "1"})
+
+    with pytest.raises(Exception):
+        c = make_constraint("not_equals", "a", "b")
         c.check({"b": "1"})
 
 

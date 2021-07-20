@@ -49,6 +49,21 @@ class EqualityConstraint(Constraint):
             return a == b
 
 
+class InequalityConstraint(Constraint):
+    def __init__(self, variable_name: str, other_name: str) -> None:
+        super().__init__("not_equals", variable_name)
+        self.other_name = other_name
+
+    def check(self, filler: Dict[str, str]) -> bool:
+        a = filler[self.variable_name]
+        b = filler[self.other_name]
+        # a dirty hack to ensure that numeric equality is checked
+        try:
+            return float(a) != float(b)
+        except Exception:
+            return a != b
+
+
 class LessThanConstraint(Constraint):
     def __init__(self, variable_name: str, other_name: str) -> None:
         super().__init__("less_than", variable_name)
@@ -73,6 +88,7 @@ class GreaterThanConstraint(Constraint):
 
 binary_constraints = {
     "equals": lambda a, b: EqualityConstraint(a, b),
+    "not_equals": lambda a, b: InequalityConstraint(a, b),
     "less_than": lambda a, b: LessThanConstraint(a, b),
     "greater_than": lambda a, b: GreaterThanConstraint(a, b),
 }
